@@ -5,6 +5,8 @@
 #include <string>
 #include <exception>
 #include <iomanip>
+#include <filesystem>
+#include <chrono>
 
 #include "neuralnetwork.h"
 
@@ -16,6 +18,10 @@ double scale_data(int input) {
 
 std::vector<std::vector<double>> read_csv_data(std::string filepath) {
     std::vector<std::vector<double>> data;
+
+    if (!std::filesystem::exists(filepath)) {
+        throw std::runtime_error("csv file not found: " + filepath);
+    }
 
     std::ifstream infile{filepath};
     std::string line;
@@ -67,9 +73,13 @@ void print_vector(const std::vector<T> data) {
 /* gets the input data from the csv data */
 std::vector<double> get_input(const std::vector<double> &training_data) {
     std::vector<double> input;
-    
-    auto it = std::next(training_data.begin(), 1);
-    input.insert(input.end(), it, training_data.end());
+    try {
+        auto it = std::next(training_data.begin(), 1);
+        input.insert(input.end(), it, training_data.end());
+    } catch (const std::out_of_range &err) {
+        std::cout << "Out of range err: " << err.what() << std::endl;
+        throw std::runtime_error("Err get input");
+    } 
 
     return input;
 }
@@ -85,7 +95,7 @@ std::vector<double> get_targets(const std::vector<double> &training_data, int on
         std::cout << "Out of Range: " << err.what() << " tried accessing training data: " << training_data.at(0) << std::endl;
         throw std::runtime_error("Err");
     }
-
+    
     return targets;
 }
 
@@ -101,46 +111,47 @@ void print_test_result(const std::vector<T> data) {
 }
 
 int main(int argc, const char *argv[]) {
-    /* number of nodes in the layers */
-    int input_nodes = 784;
-    int hidden_nodes = 100;
-    int output_nodes = 10;
-    
-    int rounds = atoi(argv[1]);
+    int epochs = atoi(argv[1]);
     int test_data_set = atoi(argv[2]);
+    const std::vector<int> neurons = {784, 100, 10};
 
     /* Path to training and test data */
-    std::string training_data_file = "./mnist_dataset/mnist_train.csv";
-    std::string test_data_file = "./mnist_dataset/mnist_test.csv";
+    std::string training_data_file = "./mnist_test/mnist_train_100.csv";
+    std::string test_data_file = "./mnist_test/mnist_test_10.csv";
 
-    /* initialize the neuralnetwork */
-    Neuralnetwork neuralnet{input_nodes, hidden_nodes, output_nodes, 0.3};
+    Neuralnetwork neuralnet{neurons, 0.3};
 
     /* read the training and test data */
     std::vector<std::vector<double>> training_data = read_csv_data(training_data_file);
     std::vector<std::vector<double>> test_data = read_csv_data(test_data_file);
 
     /* train on the training data */
-    std::cout << "Training Network on " << rounds << " Datasets" << std::endl;
-    int i = 0;
-    for (const auto &data_set: training_data) {
-        if (i == rounds) {
-            break;
+    std::cout << "Training Network with " << epochs << " epochs" << std::endl;
+    try {
+    const auto start{std::chrono::steady_clock::now()};
+    for (int i = 0; i < epochs; ++i) {
+        for (const auto &data_set: training_data) {
+            std::vector<double> targets = get_targets(data_set, 10);
+            std::vector<double> inputs = get_input(data_set);
+            
+            neuralnet.train(inputs, targets); 
         }
-        std::vector<double> targets = get_targets(data_set, output_nodes);
-        std::vector<double> inputs = get_input(data_set);
-
-        neuralnet.train(inputs, targets); 
-        ++i;
     }
+    const auto end{std::chrono::steady_clock::now()};
+    const std::chrono::duration<double> elapsed_seconds{end - start};
+    std::cout << "Training done, duraction: " << elapsed_seconds << std::endl;
 
     /* query the network using the test data */
     std::vector<double> test_input = get_input(test_data.at(test_data_set));
     std::cout << "Querying Neuralnetwork" << std::endl;
     std::cout << "Expected Value : " << test_data.at(test_data_set).at(0) << std::endl;
     std::vector<double> test_result = neuralnet.query(test_input);
-
+    
     print_test_result(test_result);
 
-    return 0;
+    } catch (const std::exception &e) {
+        std::cout << "Exception caught: " << e.what() << std::endl;
+    }
+
+    std::exit(EXIT_SUCCESS);
 }

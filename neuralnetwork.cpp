@@ -1,110 +1,69 @@
 #include "neuralnetwork.h"
 
 Neuralnetwork::Neuralnetwork(
-    int inputnodes, 
-    int hiddennodes,
-    int outputnodes,
-    double learningrate 
-):  
-    inodes(inputnodes),
-    hnodes(hiddennodes), 
-    onodes(outputnodes),
-    learningrate(learningrate)
-{
-    init_weights();
+    std::vector<int> neurons,
+    double learningrate
+): learningrate(learningrate) {
+    /* create and init weights, first layer is skipped */
+    for (std::size_t i = 1; i < neurons.size(); ++i) {
+        /* create empty vector */
+        std::vector<std::vector<double>> weight;
+        std::pair<std::size_t, std::size_t> shape{neurons.at(i), neurons.at(i - 1)};
+        uniform_random_initialization(weight, shape, -1.0, 1.0);
+        weights.push_back(weight);
+    }
 }
 
 void Neuralnetwork::train(const std::vector<double> &inputs, const std::vector<double> &targets) {
-    try {
-        /* feed forward the signal */    
-        std::vector<double> hidden_outputs = multiply_2dim_times_1dim_array(
-            wih,
-            inputs
-        );
+    std::vector<std::vector<double>> outputs;
+    std::vector<double> error;
+    std::vector<double> input = inputs;
 
-        /* apply sigmoid function */
-        std::transform(hidden_outputs.begin(), hidden_outputs.end(), hidden_outputs.begin(), sigmoid);
-
-        /* calculate final outputs */
-        std::vector<double> final_outputs = multiply_2dim_times_1dim_array(
-            who,
-            hidden_outputs
-        );
-        std::transform(final_outputs.begin(), final_outputs.end(), final_outputs.begin(), sigmoid);
-
-        /* get error from targets */
-        std::vector<double> outputs_error = calculate_error(targets, final_outputs);
-
-        /* 
-        *   back propagate the error to the hidden layer 
-        *   erros_hidden = WhoT * output_error
-        */
-        std::vector<double> error_hidden;
-
-        /* transform Weights */
-        std::vector<std::vector<double>> transposed_who = transpose_matrix(who);
-        error_hidden = multiply_2dim_times_1dim_array(transposed_who, outputs_error);
-
-        /* update weights between hidden and final output */
-        who = update_weights(who, outputs_error, hidden_outputs, final_outputs);    
-
-        /* update weights between input and hidden */
-        wih = update_weights(wih, error_hidden, inputs, hidden_outputs);    
-    } catch (std::exception &err) {
-        throw std::runtime_error("Error training network");
-    }
-} 
-
-/* takes input and returns the output of the network */
-std::vector<double> Neuralnetwork::query(const std::vector<double> &inputs) {
-    std::vector<double> final_outputs;
-
-    try {
-        /* weights times input, 2dim * 1dim vector */    
-        std::vector<double> hidden_outputs = multiply_2dim_times_1dim_array(
-            wih,
-            inputs
-        );
-
-        /* apply sigmoid function */
-        std::transform(hidden_outputs.begin(), hidden_outputs.end(), hidden_outputs.begin(), sigmoid);
-
-        /* hidden outputs is then used a input to output layer */
-        final_outputs = multiply_2dim_times_1dim_array(
-            who,
-            hidden_outputs
-        );
-        
-        std::transform(final_outputs.begin(), final_outputs.end(), final_outputs.begin(), sigmoid);
-
-    } catch (std::exception &err) {
-        throw std::runtime_error("Error querying network");
+    /* feed forward signal and save the output of every layer */
+    for (auto &weight: weights) {
+        std::vector<double> output = multiply_2dim_times_1dim_array(weight, input);
+        std::transform(output.begin(), output.end(), output.begin(), sigmoid);
+        input = output;
+        outputs.push_back(output);
     }
 
-    return final_outputs;
-} 
+    /* 
+    *   backpropagate the error, begining with the weights between Output layer and last hidden layer
+    *   On a 3 Layer Network the next loop will only make 1 iteration
+    *   first calculate the final output error, the hidden error, then input error
+    */
+    error = calculate_error(targets, outputs.at(weights.size() - 1));
+    for (std::size_t i = weights.size() - 1; i > 0; --i) {
+        /* then update the weights based on the error */
+        weights.at(i) = update_weights(weights.at(i), error, outputs.at(i - 1), outputs.at(i));
 
-void Neuralnetwork::print_weights() {
-    std::cout << "WIH: " << std::endl;
-    for(const auto &i: wih) {
-        for (const auto &j: i) {
-            std::cout << std::fixed;
-            std::cout << std::setprecision(4);
-            std::cout << j << " ";
-        }
-        std::cout << std::endl;
+        /* calculate error for the every hidden layer and update the weights in the next iteration */
+        std::vector<std::vector<double>> weightT = transpose_matrix(weights.at(i));
+        error = multiply_2dim_times_1dim_array(weightT, error);
     }
 
-    std::cout << "WHO: " << std::endl;
-    for(const auto &i: who) {
-        for (const auto &j: i) {
-            std::cout << std::fixed;
-            std::cout << std::setprecision(4);
-            std::cout << j << " ";
-        }
-        std::cout << std::endl;
-    }
+    /* 
+    *   Now every hidden layer is updated 
+    *   last step is to update weights between input and first hidden layer 
+    */
+    weights.at(0) = update_weights(weights[0], error, inputs, outputs[0]);
 }
+
+std::vector<double> Neuralnetwork::query(const std::vector<double> &inputs) {
+    std::vector<double> output;
+    std::vector<double> input = inputs;
+
+    for (auto &weight: weights) {
+        /* get output */
+        output = multiply_2dim_times_1dim_array(weight, input);
+        /* apply activation */
+        std::transform(output.begin(), output.end(), output.begin(), sigmoid);
+        input = output;
+    }
+
+    return output;
+}
+        
 
 double Neuralnetwork::sigmoid(double x) {
     double result = 0.0;
@@ -112,42 +71,26 @@ double Neuralnetwork::sigmoid(double x) {
     return result;
 }
 
-/* init weights with random numbers */
-void Neuralnetwork::init_weights() {
-    std::random_device dev;
-    /* seed using random device, 1 used for testing */
-    std::mt19937 rng(dev());
-    /* random number distribution */
-    std::normal_distribution<double> unif(0.0, std::pow(hnodes, -0.5));
+template<typename T>
+void Neuralnetwork::uniform_random_initialization(
+    std::vector<std::vector<T>> &weights,
+    const std::pair<std::size_t, std::size_t> &shape,
+    const T &low, const T &high
+) {
+    weights.clear();
 
-    /* init weights between hidden and input layer */
-    for (int i = 0; i < hnodes; ++i) {
-        std::vector<double> random_weights;
-        for (int j = 0; j < inodes; ++j) {
-            double ran_num = unif(rng);
-            random_weights.push_back(ran_num);
-            if (ran_num > 1.0) {
-                std::cout << "Error initiating weight, above 1.0: " << ran_num << std::endl;
-            }
+    std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
+    std::uniform_real_distribution<T> distribution(low, high);
+
+    for (size_t i = 0; i < shape.first; i++) { 
+        std::vector<T> row;  
+        row.resize(shape.second);
+        for (auto &r : row) {            
+            r = distribution(generator);  
         }
-
-        wih.push_back(random_weights);
+        weights.push_back(row);  
     }
-
-    std::normal_distribution<double> normd(0.0, std::pow(inodes, -0.5));
-    /* init weights between hidden layer and output layer */
-    for (int i = 0; i < onodes; ++i) {
-        std::vector<double> random_weights;
-        for (int j = 0; j < hnodes; ++j) {
-            double ran_num = normd(rng);
-            random_weights.push_back(ran_num);
-            if (ran_num > 1.0) {
-                std::cout << "Error initiating weight, above 1.0: " << ran_num << std::endl;
-            }
-        }
-
-        who.push_back(random_weights);
-    }
+    return;
 }
 
 std::vector<double> Neuralnetwork::calculate_error(
@@ -189,6 +132,9 @@ std::vector<std::vector<double>> Neuralnetwork::update_weights(
     std::size_t weights_cols = weights_jk[0].size();
 
     if (error.size() != weights_rows || output_j.size() != weights_cols || output_k.size() != weights_rows) {
+        std::cerr << "Error: " << error.size() << " Weights rows: " << weights_rows << std::endl;
+        std::cerr << "output_j: " << output_j.size() << " Weights cols: " << weights_cols << std::endl;
+        std::cerr << "output_k: " << output_k.size() << " Weights rows: " << weights_rows << std::endl;
         throw std::invalid_argument("Dimensions dont fit to update the weights");
     }
 
@@ -207,14 +153,15 @@ std::vector<std::vector<double>> Neuralnetwork::update_weights(
     return updated_weights;
 }
 
-/* Matrix times vector function */
+/* Matrix Vector product */
 std::vector<double> Neuralnetwork::multiply_2dim_times_1dim_array(
     const std::vector<std::vector<double>> &matrix,
     const std::vector<double> &vector
 ) {
     /* check dimension and compatibility */
     if (matrix.empty() || vector.empty() || matrix[0].size() != vector.size()) {
-        throw std::invalid_argument("Matrix and Vector are not compatible for multiplication");
+        std::cerr << "Matrix and Vector are not compatible for multiplication" << std::endl;
+        std::exit(EXIT_FAILURE);
     }
 
     /* dimension of the matrix */

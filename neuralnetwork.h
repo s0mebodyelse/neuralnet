@@ -1,5 +1,9 @@
+#ifndef NEURALNETWORK_HPP
+#define NEURALNETWORK_HPP
+
 #include <iostream>
 #include <vector>
+#include <ranges>
 #include <array>
 #include <random>
 #include <cmath>
@@ -8,32 +12,34 @@
 
 class Neuralnetwork {
     public:
+        /* default constructor */
+        Neuralnetwork() = default;
+
         Neuralnetwork(
-            int inputnodes, 
-            int hiddennodes,
-            int outputnodes,
+            std::vector<int> neurons,
             double learningrate
         );
 
         void train(const std::vector<double> &inputs, const std::vector<double> &targets);
         std::vector<double> query(const std::vector<double> &inputs);
 
-        void print_weights();
-
+        /* activation function */
         static double sigmoid(double x);
 
     private:
-        int inodes;
-        int hnodes;
-        int onodes;
         double learningrate;
 
         /* weights between nodes */
-        std::vector<std::vector<double>> wih;
-        std::vector<std::vector<double>> who;
+        std::vector<std::vector<std::vector<double>>> weights;
 
         /* initializes the weights with random numbers betwenn 0.0 and 1.0 */        
         void init_weights();
+        template <typename T>
+        void uniform_random_initialization(
+            std::vector<std::vector<T>> &weights, 
+            const std::pair<std::size_t, std::size_t> &shape,
+            const T &low, const T &high
+        );
 
         /* 
         *   E = -(Tk - Ok)
@@ -84,3 +90,5 @@ class Neuralnetwork {
         void print_matrix(const std::vector<std::vector<double>> &matrix);
         void print_vector(const std::vector<double> &vector);
 };
+
+#endif
