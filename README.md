@@ -8,7 +8,7 @@ clang++ -std=c++20 main.cpp neuralnetwork.cpp -o nn -Wall
 ./nn <number of epochs> <learning_rate>  
  ./nn 1 0.3
 
-# Example output
+# Example output on the full MNIST Dataset
 ./nn 6 0.1                                                   
 Reading CSV Files  
 Training Network with 6 epochs  
