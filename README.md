@@ -22,3 +22,14 @@ Epoch 4 done, duraction: 13.4603s
 Training done, duraction: 67.4299s
 Testing Network
 Network Performance (percentage of correct output): 0.9396
+
+## Using Threads
+-> slower, lol
+./nn 1 0.3 1
+Reading CSV Files
+Training Network with 1 epochs
+Epoch 0 done, duraction: 18.9015s
+Training done, duraction: 18.9015s
+Testing Network
+Network Performance (percentage of correct output): 0.9231
+
