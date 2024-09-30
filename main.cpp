@@ -125,14 +125,15 @@ bool check_result(int expected_value, std::vector<T> result) {
 int main(int argc, const char *argv[]) {
     int epochs = atoi(argv[1]);
     double learning_rate = atof(argv[2]);
+    int thread_num = atoi(argv[3]);
 
-    const std::vector<int> neurons = {784, 300, 10};
+    const std::vector<int> neurons = {784, 100, 10};
 
     /* Path to training and test data */
     std::string training_data_file = "./mnist/mnist_train.csv";
     std::string test_data_file = "./mnist/mnist_test.csv";
 
-    Neuralnetwork neuralnet{neurons, learning_rate};
+    Neuralnetwork neuralnet{neurons, learning_rate, thread_num};
 
     /* read the training and test data */
     std::cout << "Reading CSV Files" << std::endl;
@@ -143,12 +144,19 @@ int main(int argc, const char *argv[]) {
     std::cout << "Training Network with " << epochs << " epochs" << std::endl;
     const auto start{std::chrono::steady_clock::now()};
     for (int i = 0; i < epochs; ++i) {
+        const auto epoch_start{std::chrono::steady_clock::now()};
         for (const auto &data_set: training_data) {
             std::vector<double> targets = get_targets(data_set, neurons.at(neurons.size() - 1));
             std::vector<double> inputs = get_input(data_set);
             
             neuralnet.train(inputs, targets); 
         }
+        const auto epoch_end{std::chrono::steady_clock::now()};
+        const std::chrono::duration<double> epoch_seconds{
+            epoch_end - epoch_start
+        };
+        std::cout << "Epoch " << i << " done, duraction: ";
+        std::cout << epoch_seconds << std::endl;
     }
     const auto end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> elapsed_seconds{end - start};
@@ -170,10 +178,12 @@ int main(int argc, const char *argv[]) {
     }  
 
     double performance = std::reduce(scoreboard.begin(), scoreboard.end());
-    std::cout << "Network Performance: ";
+    std::cout << "Network Performance (percentage of correct output): ";
     std::cout << std::fixed;
     std::cout << std::setprecision(4);
     std::cout << performance / scoreboard.size() << std::endl;
+
+    neuralnet.printPerfmon();
 
     std::exit(EXIT_SUCCESS);
 }

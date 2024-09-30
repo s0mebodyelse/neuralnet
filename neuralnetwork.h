@@ -9,6 +9,9 @@
 #include <cmath>
 #include <sstream>
 #include <iomanip>
+#include <thread>
+#include <unordered_map>
+#include <chrono>
 
 class Neuralnetwork {
     public:
@@ -17,17 +20,32 @@ class Neuralnetwork {
 
         Neuralnetwork(
             std::vector<int> neurons,
-            double learningrate
+            double learningrate,
+            int thread_num
         );
 
         void train(const std::vector<double> &inputs, const std::vector<double> &targets);
         std::vector<double> query(const std::vector<double> &inputs);
+
+        void printPerfmon();
 
         /* activation function */
         static double sigmoid(double x);
 
     private:
         double learningrate;
+
+        /* 
+         * performance analysis
+         * counts every function call and stores
+         * sum of the duration of every function
+        */
+        std::unordered_map<std::string, 
+            std::pair<int, std::chrono::duration<double>>> perfmon;
+
+        /* threading */
+        int thread_num;
+        std::vector<std::thread> threads;
 
         /* weights between nodes */
         std::vector<std::vector<std::vector<double>>> weights;
@@ -78,6 +96,12 @@ class Neuralnetwork {
 
 
         /* Matrix multiplication helper functions */
+        std::vector<double> multiply_2dim_times_1dim_array_old(
+            const std::vector<std::vector<double>> &matrix,
+            const std::vector<double> &vector
+        );
+        
+        /* multithreaded version of the matrix multiplication */
         std::vector<double> multiply_2dim_times_1dim_array(
             const std::vector<std::vector<double>> &matrix,
             const std::vector<double> &vector
@@ -89,6 +113,10 @@ class Neuralnetwork {
 
         void print_matrix(const std::vector<std::vector<double>> &matrix);
         void print_vector(const std::vector<double> &vector);
+
+        void countFunctionCall(std::string func_name,
+                std::chrono::duration<double> time
+        );
 };
 
 #endif
