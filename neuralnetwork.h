@@ -96,7 +96,7 @@ class Neuralnetwork {
 
 
         /* Matrix multiplication helper functions */
-        std::vector<double> multiply_2dim_times_1dim_array_old(
+        std::vector<double> multiply_2dim_times_1dim_array_serial(
             const std::vector<std::vector<double>> &matrix,
             const std::vector<double> &vector
         );

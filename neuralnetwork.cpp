@@ -1,4 +1,5 @@
 #include "neuralnetwork.h"
+#include "objs/vectorops_ispc.h"
 
 Neuralnetwork::Neuralnetwork(
     std::vector<int> neurons,
@@ -166,7 +167,7 @@ std::vector<std::vector<double>> Neuralnetwork::update_weights(
 }
 
 /* Matrix Vector product */
-std::vector<double> Neuralnetwork::multiply_2dim_times_1dim_array_old(
+std::vector<double> Neuralnetwork::multiply_2dim_times_1dim_array_serial(
     const std::vector<std::vector<double>> &matrix,
     const std::vector<double> &vector
 ) {
@@ -195,7 +196,7 @@ std::vector<double> Neuralnetwork::multiply_2dim_times_1dim_array_old(
     const auto func_end{std::chrono::steady_clock::now()};
     const std::chrono::duration<double> func_seconds{
         func_end - func_start };
-    countFunctionCall("multiply_2dim_times_1dim_array_old", func_seconds);
+    countFunctionCall("multiply_2dim_times_1dim_array_serial", func_seconds);
 
     return dot_product;
 }
@@ -208,7 +209,7 @@ std::vector<double> Neuralnetwork::multiply_2dim_times_1dim_array(
     const auto func_start{std::chrono::steady_clock::now()};
 
     if (thread_num == 0) {
-        return multiply_2dim_times_1dim_array_old(matrix, vector);
+        return multiply_2dim_times_1dim_array_serial(matrix, vector);
     }
 
     /* check dimension and compatibility */
